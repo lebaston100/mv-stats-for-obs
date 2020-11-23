@@ -1,0 +1,225 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title></title>
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    <style>
+        body{margin:0; padding:0;background-color:#000;color:#fff}
+        .wrapper{width:100%;height:100%;padding:1% 0 0%;}
+        .stream{width:100%;height:30%;}
+        .timecode{width:100%;height:15%;padding-bottom:4%}
+        .data{width:50%;height:45%;float:left;padding-right:0%}
+        .data2{width:40%;height:45%;float:right;padding-left:5%}
+        .destination{width:100%;height:5%;padding-top:6%}
+
+        .stext{font:bold 27vh/27vh Arial Black, sans-serif;text-align: center;text-transform:uppercase}
+        .ttext{font:400 13vh/12vh Tahoma, sans-serif;text-align: center;text-transform:uppercase}
+        .d1text, .d2text{font:400 5vh/4vh Tahoma, sans-serif;margin:0;padding:0;text-transform:uppercase}
+        .d1btext, .d2btext{font:400 22vh/19vh Tahoma, sans-serif;text-transform:uppercase;margin:0;padding:0}
+        .d1text, .d1btext{text-align: right;}
+        .d2text, .d2btext{text-align: left;}
+        .destext{font:400 11vh/8vh Tahoma, sans-serif;text-align: center;text-transform:uppercase}
+        .glow{ text-shadow: 0 0 10px #272727, 0 0 30px #fc4f4f;}
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/obs-websocket-js@4.0.1/dist/obs-websocket.min.js" integrity="sha256-BgpIV/E8OA3M7FZgZ4ojs2D++Zb+DvBKTHHXmQ2M2zM=" crossorigin="anonymous"></script>
+    <script>
+        window.addEventListener("load", init, false);
+        var serverip = "127.0.0.1:4444";    // Change the server IP/port here
+        var password = "mypassword";        // Set password here
+
+        const obs = new OBSWebSocket();
+
+        function init() {
+            console.log("Trying to connect to obs...");
+            obs.connect({ address: serverip, password: password });
+        }
+
+        obs.on("ConnectionOpened", () => {
+            console.log("OBS Connection opened");
+
+            // Update the destination field
+            updateStreamingDestination();
+			            
+            // StreamStatus event
+            obs.on("StreamStatus", data => {
+                if (data) {
+                    setTimecode(data.streamTimecode);
+                    setStreamDataRate(data.kbitsPerSec);
+                    calculateColorStatus(data);
+					// Update text when page is reloaded after the stream was started
+					if (data.streaming === true && document.getElementById("streamstatus").innerHTML === "off") {
+						setLiveTextFormating("red");
+						changeElementContent("streamstatus", "on air");
+					}
+                }
+                setTimeout( () => {
+                    obs.sendCallback("GetStreamingStatus", (err, data) => {
+                        if (data) setTimecode(data.streamTimecode);
+                    });
+                }, 1000);
+            });
+
+            // ProfileChanged event
+            obs.on("ProfileChanged", data => {
+                setTimeout( () => {
+                    updateStreamingDestination();
+                }, 1000);
+            });
+
+            // StreamStarting event
+            obs.on("StreamStarting", data => {
+                if (data) {
+                    setLiveTextFormating("red");
+                    changeElementContent("streamstatus", "connecting");
+                }
+                updateStreamingDestination();
+            });
+
+            // StreamStarted event
+            obs.on("StreamStarted", data => {
+                if (data) {
+                    changeElementContent("streamstatus", "on air");
+                    setTimecode(data.streamTimecode);
+                }
+            });
+
+            // StreamStopping event
+            obs.on("StreamStopping", data => {
+                if (data) {
+                    changeElementContent("streamstatus", "disconnecting");
+                    setTimecode(data.streamTimecode);
+                }
+            });
+
+            // StreamStopped event
+            obs.on("StreamStopped", data => {
+                if (data) {
+                    setLiveTextFormating("white");
+                    changeElementContent("streamstatus", "off");
+                    setTimeout( () => {
+                        setTimecode("00:00:00.000");
+                        setStreamDataRate(0.0);
+						changeElementColor("streamhealth", "white");
+                    }, 1000);
+                }
+            });
+        });
+
+        obs.on("ConnectionClosed", () => {
+            console.log("Connection Closed");
+            setTimeout(init, 2000);
+        });
+
+        obs.on("error", err => {
+            console.log("socket error:", err);
+        });
+
+        
+        // Stuff to make things easier
+        function setLiveTextFormating(color) {
+            const elem = document.getElementById("streamstatus");
+            elem.style.color = color;
+
+            if (color == "red") {
+                elem.classList.add("glow");
+            } else {
+                elem.classList.remove("glow");
+            }
+        }
+
+        function setStreamDataRate(dr) {
+            changeElementContent("streamdatarate", (dr/1000).toFixed(2));
+        }
+
+        function setTimecode(tc) {
+            changeElementContent("streamtimecode", trimTimecode(tc));
+        }
+
+        function updateStreamingDestination() {        
+            obs.sendCallback("GetStreamSettings", (err, data) => {
+                const elem = document.getElementById("streamdestination");
+                if (data !== undefined) {
+                    if (data.type == "rtmp_common" && data.settings.service == "YouTube / YouTube Gaming") {
+                        elem.innerHTML = "YouTube";
+                    } else if (data.type == "rtmp_common" && data.settings.hasOwnProperty("service")) {
+                        elem.innerHTML = data.settings.service;
+                    } else if (data.type == "rtmp_custom" && data.settings.hasOwnProperty("server") && data.settings.server != "") {
+                        var url = new URL(data.settings.server.replace("rtmp", "http")).hostname;
+                        elem.innerHTML = url;
+                    } else {
+                        elem.innerHTML = "Nothing?";
+                    }
+                }
+            });
+        }
+
+        // This congestion color calculation was directly translated into javascript from obs-studio source code
+        // https://github.com/obsproject/obs-studio/blob/master/UI/window-basic-status-bar.cpp#L327-L356
+        var lastCongestion = 0.0;
+        function calculateColorStatus(data) {
+            const EPSILON = 0.000100;
+            let congestion = data.strain;
+            let avgCongestion = (congestion + lastCongestion) * 0.5;
+            if (avgCongestion < congestion) avgCongestion = congestion;
+            if (avgCongestion > 1.0) avgCongestion = 1.0;
+            lastCongestion = congestion;
+
+            if (avgCongestion < EPSILON) {
+				changeElementColor("streamhealth", "green");
+            } else if (Math.abs(avgCongestion - 1.0) < EPSILON) {
+				changeElementColor("streamhealth", "red");
+            } else {
+                let red = avgCongestion * 2.0;
+                if (red > 1.0) red = 1.0;
+                red *= 255.0;
+
+                let green = (1.0 - avgCongestion) * 2.0;
+                if (green > 1.0) green = 1.0;
+                green *= 255.0;
+
+				changeElementColor("streamhealth", `rgb(${Math.floor(red)}, ${Math.floor(green)}, 0)`);
+            }
+        }
+
+        // Utils
+        function changeElementContent(id, newContent) {
+            document.getElementById(id).innerHTML = newContent;
+        }
+
+        function changeElementColor(id, color) {
+            document.getElementById(id).style.color = color;
+        }
+
+        function trimTimecode(tc) {
+            return tc.split(".")[0];
+        }
+    </script>
+</head>
+<body>
+    <div class="wrapper">
+        <div class="stream stext" style="color:#ffffff" id="streamstatus">off</div><!--1st Tier-->
+        <div class="timecode ttext" id="streamtimecode">00:00:00</div><!--2nd Tier-->
+
+        <!--Start 3rd Tier, Data Stream Slots-->
+        <div class="data">
+            <p class="d1text">data rate&nbsp;<label style="text-transform:none">Mb/s</label>&nbsp;</p>
+            <p class="d1btext" id="streamdatarate">0.00</p>
+        </div>
+        <!--End 3rd Tier-->
+
+        <!--Start 3rd Tier, Health Slot right-->
+        <div class="data2">
+            <p class="d2text">Health</p>
+            <p class="d2btext">
+                <i class="fa fa-bar-chart" style="font-size:18vh;color:white" id="streamhealth"></i><br />
+            </p>
+        </div>
+        <!-- End 3rd Tier right side-->
+
+        <br style="clear:right" />
+        <div class="destination destext" style="text-transform:none" id="streamdestination">NOT CONNECTED</div>
+        <!--5th Tier, destination streamed-->
+    </div>
+</body>
+</html>

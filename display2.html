@@ -1,0 +1,228 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title></title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    <style>
+        body{margin:0; padding:0;background-color:#000;color:#fff}
+       .wrapper {width: 100%;height: 100%;padding: 1% 0 0%;}
+        .record{width:100%;height:30%;}
+        .timecode{width:100%;height:15%;padding-bottom:4%}
+        .data{width:45%;height:45%;float:left;padding-right:5%}
+        .data2{width:45%;height:45%;float:right;padding-left:5%}
+        .destination{width:100%;height:5%;padding-top:7%}
+
+        .stext{font:bold 27vh/27vh Arial Black, sans-serif;text-align: center;text-transform:uppercase}
+        .ttext{font:400 13vh/12vh Tahoma, sans-serif;text-align: center;text-transform:uppercase}
+        .d1text, .d2text{font:400 6vh/4vh Tahoma, sans-serif;margin:0;padding:0;text-transform:uppercase}
+        .d1btext, .d2btext{font:400 22vh/19vh Tahoma, sans-serif;text-transform:uppercase;margin:0;padding:0;}
+        .d1text, .d1btext{text-align: right;}
+        .d2text, .d2btext{text-align: left;}
+        .destext{font:400 11vh/8vh Tahoma, sans-serif;text-align: center;text-transform:uppercase}
+        .glow{ text-shadow: 0 0 10px #272727, 0 0 20px #fc4f4f;}
+
+        /*Storage bar*/
+        .styled meter {
+            /* Reset the default appearance */
+            -webkit-appearance: none;-moz-appearance: none;appearance: none;
+            /* For Firefox */
+            background: #EEE;border-radius: 25px;width: 35vh;height: 12vh;}
+            /* WebKit */
+            .styled meter::-webkit-meter-bar {background: #EEE;box-shadow: 0 2px 3px rgba(0,0,0,0.2) inset;border-radius: 3px;}
+            .styled meter::-webkit-meter-optimum-value,
+            .styled meter::-webkit-meter-suboptimum-value,
+            .styled meter::-webkit-meter-even-less-good-value {border-radius: 3px;}
+            .styled meter::-webkit-meter-optimum-value {background: #CC4600;}
+            .styled meter::-webkit-meter-suboptimum-value {background: #FFDB1A;}
+            .styled meter::-webkit-meter-even-less-good-value {background: #86CC00;}
+            /* Firefox */
+            .styled meter::-moz-meter-bar {border-top-left-radius: 25px;border-bottom-left-radius: 25px}
+            .styled meter:-moz-meter-optimum::-moz-meter-bar {background: #CC4600}
+            .styled meter:-moz-meter-sub-optimum::-moz-meter-bar {background: #FFDB1A;}
+            .styled meter:-moz-meter-sub-sub-optimum::-moz-meter-bar {background: #86CC00;}
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/obs-websocket-js@4.0.1/dist/obs-websocket.min.js" integrity="sha256-BgpIV/E8OA3M7FZgZ4ojs2D++Zb+DvBKTHHXmQ2M2zM=" crossorigin="anonymous"></script>
+    <script>
+        window.addEventListener("load", init, false);
+        var serverip = "127.0.0.1:4444";    // Change the server IP/port here
+        var password = "mypassword";        // Set password here
+
+        const obs = new OBSWebSocket();
+        let interval = null;
+        let diskspace = 0;
+
+        function init() {
+            console.log("Trying to connect to obs...");
+            obs.connect({ address: serverip, password: password });
+        }
+
+        obs.on("ConnectionOpened", () => {
+            console.log("OBS Connection opened");
+
+            // Update the destination field
+            updateRecordingDestination();
+
+            // RecordingStarting event
+            obs.on("RecordingStarting", data => {
+                if (data) {
+                    setRecTextFormating("red");
+                    changeElementContent("recordingstatus", "starting");
+                }
+
+                updateRecordingDestination();
+
+                interval = setInterval( () => {
+                    // get recording timecode
+                    obs.sendCallback("GetStreamingStatus", (err, data) => { // replace with GetRecordingStatus when released
+                        if (data) setTimecode(data.recTimecode);
+                    });
+
+                    // get current fps
+                    obs.sendCallback("GetStats", (err, data) => {
+                        if (data) {
+                            changeElementContent("currentfps", Math.round(data.stats.fps));
+                            if (diskspace == 0) {
+                                diskspace = data.stats["free-disk-space"];
+                            } else {
+                                setDiskSpace(data.stats["free-disk-space"], diskspace);
+                            }
+                        }
+                    });
+                }, 1000);
+            });
+
+            // ProfileChanged event
+            obs.on("ProfileChanged", data => {
+                setTimeout( () => {
+                    updateRecordingDestination();
+                }, 1000);
+            });
+
+            // RecordingStarted event
+            obs.on("RecordingStarted", data => {
+                if (data) {
+                    changeElementContent("recordingstatus", "rec");
+                    setTimecode(data.recTimecode);
+                }
+            });
+
+            // RecordingPaused event
+            obs.on("RecordingPaused", data => {
+                if (data) {
+                    changeElementContent("recordingstatus", "paused");
+                    setTimecode(data.recTimecode);
+                }
+            });
+
+            // RecordingResumed event
+            obs.on("RecordingResumed", data => {
+                if (data) {
+                    changeElementContent("recordingstatus", "rec");
+                    setTimecode(data.recTimecode);
+                }
+            });
+
+            // RecordingStopping event
+            obs.on("RecordingStopping", data => {
+                if (data) {
+                    changeElementContent("recordingstatus", "stopping");
+                    setTimecode(data.recTimecode);
+                }
+            });
+
+            // RecordingStopped event
+            obs.on("RecordingStopped", data => {
+                if (data) {
+                    setRecTextFormating("white");
+                    changeElementContent("recordingstatus", "stop");
+                    setTimeout( () => {
+                        setTimecode("00:00:00.000");
+                        changeElementContent("currentfps", "00");
+                    }, 1000);
+                }
+                // clear intervall to stop polling
+                if (interval) clearInterval(interval);
+            });
+        });
+
+        obs.on("ConnectionClosed", () => {
+            console.log("Connection Closed");
+            setTimeout(init, 2000);
+        });
+
+        obs.on("error", err => {
+            console.log("socket error:", err);
+        });
+
+        
+        // Stuff to make things easier
+        function setRecTextFormating(color) {
+            const elem = document.getElementById("recordingstatus");
+            elem.style.color = color;
+
+            if (color == "red") {
+                elem.classList.add("glow");
+            } else {
+                elem.classList.remove("glow");
+            }
+        }
+
+        function setTimecode(tc) {
+            changeElementContent("recordingtimecode", trimTimecode(tc));
+        }
+
+        function setDiskSpace(curSpace, allSpace) {
+            curSpace /= 1024;
+            allSpace /= 1024;
+
+            let value = 100 - (curSpace*100)/allSpace;
+            
+            console.log(value);
+            document.getElementById("diskmeter").value = value;
+        }
+
+        function updateRecordingDestination() {        
+            obs.sendCallback("GetRecordingFolder", (err, data) => {
+                if (data !== undefined) changeElementContent("recordingdestination", data.recFolder);
+            });
+        }
+
+        // Utils
+        function changeElementContent(id, newContent) {
+            document.getElementById(id).innerHTML = newContent;
+        }
+
+        function changeElementColor(id, color) {
+            document.getElementById(id).style.color = color;
+        }
+
+        function trimTimecode(tc) {
+            return tc.split(".")[0];
+        }
+    </script>
+</head>
+<body>
+    <div class="wrapper">
+        <div class="record stext" style="color:#ffffff" id="recordingstatus">stop</div><!--1st Tier-->
+        <div class="timecode ttext" id="recordingtimecode">00:00:00</div><!--2nd Tier-->
+        <!--Start 3rd Tier, Data Rec Slots-->
+        <div class="data">
+            <p class="d1text"><i class="fa fa-hdd-o" style="font-size:5vh;"></i>&nbsp;Disk Status</p>
+            <p class="d1btext styled" style="line-height:4vh">
+             <meter min="0" max="100" low="25" high="75" value="90" id="diskmeter"></meter>
+            </p>
+        </div>
+        <!--End 3rd Tier-->
+        <!--Start 3rd Tier, FPS Slot right-->
+        <div class="data2">
+            <p class="d2text" style="margin-left:4vw">FPS</p>
+            <p class="d2btext" id="currentfps">00</p>
+        </div>
+        <!-- End 3rd Tier right side-->
+
+        <br style="clear:right" />
+        <div class="destination destext" style="text-transform:none" id="recordingdestination">NOT CONNECTED</div><!--5th Tier, destination recorded-->
+    </div>
+</body>
+</html>
