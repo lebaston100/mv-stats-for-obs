@@ -20,7 +20,7 @@ All data will auto-populate when the page is loaded and obs with obs-websocket i
 - If you want/need to, you can also set a password if you are running in an untrusted network
 
 ### Setup inside obs-studio
-- [Download this repository](https://github.com/lebaston100/mv-stats-for-obs/archive/master.zip) or clone it (you only need the display1.html and display2.html files)
+- [Download this repository](https://github.com/lebaston100/mv-stats-for-obs/archive/master.zip) OR clone it (you only need the display1.html and display2.html files) OR use the online hosted versions at [http://mv-stats.lebaston100.de/display1.html](http://mv-stats.lebaston100.de/display1.html) and [http://mv-stats.lebaston100.de/display2.html](http://mv-stats.lebaston100.de/display2.html)
 - Create 2 new scenes in obs
 - Additional work if you set a password in obs-websocket: Open each html file with a text editor and replace the "mypassword" with your password where it says "// Set password here" and save the files
 - Add a browser source in each scene with 1920x1080 and "local file" selected and pointed to each html file
