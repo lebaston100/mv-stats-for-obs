@@ -1,9 +1,16 @@
+
 # Multiview Stats for obs-studio
 
 This provides you with an atem-mini like multiview stats display to show stuff like the recording/streaming status, free disk space, stream health, current stream bitrate and streaming/recording timecode.
 
+display1.html is all about streaming related stats. The big text on the top shows the current streaming status and the stream timecode. The middle left part displays the current bitrate that is beeing sent and the middle right part shows the network congestion in the same color that the small rectangle in the obs status bar would show. The bottom line shows the streaming service (Either the name or the custom url).
+
+display2.html is mostly about recording related stats. The big text on the top shows the current recording status and the recording timecode. The middle left part displays the free disk space but be warned this is not an absolute value but calculated relative to the first free disk space value that obs sends (which is basically the free space before the recording started). The middle right part shows the current render framerate. The bottom text shows the current configured recording path.
+
+All data will auto-populate when the page is loaded and obs with obs-websocket is running.
+
 ### Requirements
-- The [obs-websocket plugin](https://github.com/Palakis/obs-websocket/releases) (Version >= 4.7.0)
+- The [obs-websocket plugin](https://github.com/Palakis/obs-websocket/releases) (Version >= 4.8.0)
 - An internet connection
 
 ### Setup obs-websocket
@@ -21,7 +28,15 @@ This provides you with an atem-mini like multiview stats display to show stuff l
 - Move the scenes into the right spot so they show up in the right place of the multiview
 - That's it!
 
+If you want to run the pages on another device in the network that is not the obs-pc, then you can manually set the obs-pc ip by editing the variable in the line before the password configuration line.
+
+If you have any problems, just open a Github issue or join my [Discord Server](https://discord.gg/PCYQJwX).
+
+Big thanks to my co-dev Rgenxer ([facebook.com/temzlemdor](https://www.facebook.com/temzlemdor) / Rgenxer#1169) for doing all the frontend development.
+
 ## Examples in stand-by
+Both pages used in multiview:
+![Example image of display2.html](https://cdn.lebaston100.de/git/amv/display3.png)
 display1.html:
 ![Example image of display1.html](https://cdn.lebaston100.de/git/amv/display1.png)
 display2.html:
