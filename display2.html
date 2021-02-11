@@ -19,7 +19,7 @@
         .d1btext, .d2btext{font:400 22vh/19vh Tahoma, sans-serif;text-transform:uppercase;margin:0;padding:0;}
         .d1text, .d1btext{text-align: right;}
         .d2text, .d2btext{text-align: left;}
-        .destext{font:400 11vh/8vh Tahoma, sans-serif;text-align: center;text-transform:uppercase}
+        .destext{font:400 11vh/8vh Tahoma, sans-serif;text-align: center;}
         .glow{ text-shadow: 0 0 10px #272727, 0 0 20px #fc4f4f;}
 
         /*Storage bar*/
@@ -74,8 +74,8 @@
 
                 interval = setInterval( () => {
                     // get recording timecode
-                    obs.sendCallback("GetStreamingStatus", (err, data) => { // replace with GetRecordingStatus when released
-                        if (data) setTimecode(data.recTimecode);
+                    obs.sendCallback("GetRecordingStatus", (err, data) => {
+                        if (data) setTimecode(data.recordTimecode);
                     });
 
                     // get current fps
@@ -178,7 +178,6 @@
 
             let value = 100 - (curSpace*100)/allSpace;
             
-            console.log(value);
             document.getElementById("diskmeter").value = value;
         }
 
@@ -222,7 +221,7 @@
         <!-- End 3rd Tier right side-->
 
         <br style="clear:right" />
-        <div class="destination destext" style="text-transform:none" id="recordingdestination">NOT CONNECTED</div><!--5th Tier, destination recorded-->
+        <div class="destination destext" id="recordingdestination">NOT CONNECTED</div><!--5th Tier, destination recorded-->
     </div>
 </body>
 </html>
