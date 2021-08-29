@@ -10,7 +10,7 @@ display2.html is mostly about recording related stats. The big text on the top s
 All data will auto-populate when the page is loaded and obs with obs-websocket is running.
 
 ### Requirements
-- The [obs-websocket plugin](https://github.com/Palakis/obs-websocket/releases) (Version >= 4.9.0)
+- The [obs-websocket plugin](https://github.com/Palakis/obs-websocket/releases/tag/4.9.1) (only version 4.9.1)
 - An internet connection
 
 ### Setup obs-websocket
