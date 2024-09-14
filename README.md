@@ -1,6 +1,6 @@
 # Multiview Stats for obs-studio
 
-This provides you with an atem-mini like multiview stats display to show stuff like the recording/streaming status, free disk space, stream health, current stream bitrate and streaming/recording timecode.
+This provides you with an atem-mini like multiview stats display to show the recording/streaming status, free disk space, stream health, current stream bitrate and streaming/recording timecode.
 
 display1.html is all about streaming related stats. The big text on the top shows the current streaming status and the stream timecode. The middle left part displays the current bitrate that is beeing sent and the middle right part shows the network congestion in the same color that the small rectangle in the obs status bar would show. The bottom line shows the streaming service (Either the name or the custom url).
 
@@ -9,7 +9,7 @@ display2.html is mostly about recording related stats. The big text on the top s
 All data will auto-populate when the page is loaded and obs with obs-websocket enabled is running.
 
 ### Requirements
-- OBS 28 or later
+- OBS 30 or later
 - An internet connection
 
 ### Setup obs-websocket
@@ -18,19 +18,43 @@ All data will auto-populate when the page is loaded and obs with obs-websocket e
 - (If "Enable Authentication" is enabled) Copy the websocket password by clicking on "Show Connect Info"-Button -> Next to the "Server Password" field -> "Copy"-Button
 
 ### Setup inside obs-studio
-- [Download this repository](https://github.com/lebaston100/mv-stats-for-obs/archive/master.zip) OR clone it (you only need the display1.html and display2.html files) OR use the online hosted versions at [http://mv-stats.lebaston100.de/display1.html](http://mv-stats.lebaston100.de/display1.html) and [http://mv-stats.lebaston100.de/display2.html](http://mv-stats.lebaston100.de/display2.html) (only works when authentification is disabled in obs-websocket)
-- Create 2 new scenes in obs
-- Additional work if you set a password in obs-websocket: Open each html file with a text editor and replace the "secret-password" with your password where it says "// Set password here"(line 28 in display1.html and line 47 in display2.html) and save the files
-- Add a browser source in each scene with 1920x1080 and "local file" selected and pointed to each of the html files
-- You can lower the browser render framerate to save resources
-- Move the scenes into the right spot so they show up in the right place of the multiview
-- That's it!
 
-If you want to run the pages on another device in the network that is not the obs-pc, then you can manually set the obs-pc ip by editing the variable in the line before the password configuration line.
+Using the web hosted version:
+- URL for streaming stats: [http://mv-stats.lebaston100.de/display1.html?password=mypassword](http://mv-stats.lebaston100.de/display1.html?password=mypassword)
+- URL for recording stats: [http://mv-stats.lebaston100.de/display2.html?password=mypassword](http://mv-stats.lebaston100.de/display2.html?password=mypassword)
+- Create a scene for each of the required pages
+- Create a browser source per scene
+- Paste the url into the "URL" input with your password updated if you use one (For more details see "Configuration (parameters)" section below)
+- Set resolution to 1920x1080
+- (Optional to save a few resources) Check "Use custom frame rate" and lower render framerate to something like 10/15.
+
+Using the downloaded version:
+- [Download this repository](https://github.com/lebaston100/mv-stats-for-obs/archive/master.zip) and unpack OR clone it (you only need the display1.html and display2.html files)
+- Create a scene for each of the required pages
+- Create a browser source per scene
+- Depending on how you want to supply your settings you can either:
+    - RECOMMENDED: Input the path to your local file into the URL input prefixed with a `file:///`. For example: `file:///C:\display1.html?password=mypassword`. This way you can use the url parameters for configuration!
+    - Alternative: Select "Local file" and select the html file from the file browser. You'll need to edit the html file with a text editor to change settings like the password.
+- Set resolution to 1920x1080
+- (Optional to save a few resources) Check "Use custom frame rate" and lower render framerate to something like 10/15.
+- Note: The downloaded version still needs an internet connection to load third party dependencies for symbols and the obs connector.
+
+
+### Configuration parameters
+There are two different way to set settings, either by editing the default values in the html files directly or using url parameters (all parameters are optional).
+
+#### When using url parameters:
+The first url parameter needs to use a ? instead of &. Also it's possible that you may need to url-encode your host/password values if they contain special characters (esp. ?&=). Just type your host/password into [this website](https://urlencode.org/), click encode and use the displayed value in the url.
+
+#### Available parameters:
+- &host= (url param) / var obsHost = (file): This configures the ip or hostname and port of the machine running obs-websocket. It defaults to localhost/127.0.0.1 so only needs to be added if you're connecting from a different machine then the local one.
+- &password= (url param) / var obsPassword = (file): This configures the password used to authenticate with obs-websocket. Only needed if you have enabled authentication in obs-websocket.
+- &hidebottom (url param) / (no file param): This hides the server address for monitor1 and recording path for monitor 2 to not overlay with the multiview scene name labels.
+- &secure (url param) / obsProtocol = (file): Only use this if you know exactly what you are doing! Can be used to switch to wss for the websocket connection when using a wss proxy.
 
 If you have any problems, just open a Github issue or join my [Discord Server](https://discord.gg/PCYQJwX).
 
-Big thanks to my co-dev Rgenxer ([facebook.com/temzlemdor](https://www.facebook.com/temzlemdor) / Rgenxer#1169) for doing all the frontend development.
+Big thanks to my co-dev Rgenxer ([facebook.com/temzlemdor](https://www.facebook.com/temzlemdor) / Rgenxer#1169) for doing all the initial frontend development for monitor1.html and monitor2.html.
 
 ## Examples in stand-by
 Both pages used in multiview:

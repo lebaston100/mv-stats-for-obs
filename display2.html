@@ -2,8 +2,8 @@
 <html>
 <head>
     <meta charset="utf-8" />
-    <title></title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/css/all.min.css" integrity="sha512-xh6O/CkQoPOWDdYTDqeRdPCVd1SpvCA9XXcUnZS2FmJNp1coAFzvtCN9BmamE+4aHK8yyUHUSCcJHgXloTyT2A==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <title>Recording Status</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css" integrity="sha512-Kc323vGBEqzTmouAECnVceyQqyqdsSiqLQISBL29aUW4U/M7pSPA/gEUZQqv1cwx4OnYxTxve5UMg5GT6L4JJg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
     <style>
         body{margin:0; padding:0;background-color:#000;color:#fff}
         .wrapper {width: 100%;height: 100%;padding: 1% 0 0%;}
@@ -40,13 +40,15 @@
         .styled meter:-moz-meter-sub-optimum::-moz-meter-bar {background: #FFDB1A;}
         .styled meter:-moz-meter-sub-sub-optimum::-moz-meter-bar {background: #86CC00;}
     </style>
-    <script src="https://cdn.jsdelivr.net/npm/obs-websocket-js@5.0.1/dist/obs-ws.min.js" integrity="sha256-UbkntZrYTokZf8tldcF9nmOn5CNgcmDP+MNsUcKUpEE=" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/obs-websocket-js@5.0/dist/obs-ws.global.min.js"></script>
     <script>
         window.addEventListener("load", init, false);
         var obsHost = "127.0.0.1:4455";       // Change the server IP/port here
         var obsPassword = "secret-password";  // Set password here
+        var obsProtocol = "ws";               // change protocol here (if you know what you are doing)
 
         const obs = new OBSWebSocket();
+        const urlParams = new URLSearchParams(window.location.search);
         var interval = null;
         let diskspace = 0;
 
@@ -57,6 +59,11 @@
 
         // Handle websocket connection stuff
         async function attemptConnection() {
+            // Read url, password and protocol from url params if set
+            obsProtocol = urlParams.has("secure") ? "wss" : obsProtocol;
+            obsHost = urlParams.get("host") ?? obsHost;
+            obsPassword = urlParams.get("password") ?? obsPassword;
+
             // Try to connect to obs
             try {
                 const {
@@ -65,7 +72,7 @@
                 } = await obs.connect(`ws://${obsHost}`, obsPassword, {rpcVersion: 1});
                 console.log(`Connected to obs-websocket ${obsWebSocketVersion} (using RPC ${negotiatedRpcVersion})`);
             } catch (error) {
-                console.error("Failed to connect", error.code, error.message);                
+                console.error("Failed to connect", error.code, error.message);
             }
         }
 
@@ -73,30 +80,32 @@
             // Update the destination field
             await updateRecordingDestination();
 
+            async function updateRcordingStatus() {
+                let GRSres = await obs.call("GetRecordStatus");
+                let GSres = await obs.call("GetStats");
+                if (GRSres && GSres) {
+                    setTimecode(GRSres.outputTimecode);
+                    changeElementContent("currentfps", Math.round((GSres.activeFps + Number.EPSILON) * 100) / 100);
+
+                    // Handle disk space
+                    if (diskspace == 0) {
+                        diskspace = GSres.availableDiskSpace;
+                    } else {
+                        setDiskSpace(GSres.availableDiskSpace, diskspace);
+                    }
+
+                    // Stop itself when recording lo longer active
+                    if (!GRSres.outputActive) {
+                        clearInterval(interval);
+                        interval = null;
+                        changeElementContent("currentfps", "00");
+                    }
+                }
+            }
+
             async function startPollData() {
                 if (!interval) {
-                    interval = setInterval( async () => {
-                        let GRSres = await obs.call("GetRecordStatus");
-                        let GSres = await obs.call("GetStats");
-                        if (GRSres && GSres) {
-                            setTimecode(GRSres.outputTimecode);
-                            changeElementContent("currentfps", Math.round(GSres.activeFps));
-
-                            // Handle disk space
-                            if (diskspace == 0) {
-                                diskspace = GSres.availableDiskSpace;
-                            } else {
-                                setDiskSpace(GSres.availableDiskSpace, diskspace);
-                            }
-
-                            // Stop itself when recording lo longer active
-                            if (!GRSres.outputActive) {
-                                clearInterval(interval);
-                                interval = null;
-                                changeElementContent("currentfps", "00");
-                            }
-                        }
-                    }, 1000);
+                    interval = setInterval(updateRcordingStatus, 1000);
                 }
             }
             await startPollData();
@@ -109,10 +118,10 @@
                         setRecTextFormating("red");
                         changeElementContent("recordingstatus", "starting");
                         await updateRecordingDestination();
-                        await startPollData();
                         break;
                     case "OBS_WEBSOCKET_OUTPUT_STARTED":
                         changeElementContent("recordingstatus", "rec");
+                        await startPollData();
                         break;
                     case "OBS_WEBSOCKET_OUTPUT_PAUSED":
                         changeElementContent("recordingstatus", "paused");
@@ -146,6 +155,8 @@
             clearInterval(interval);
             interval = null;
             console.log("Connection Closed");
+            changeElementContent("recordingdestination", "NOT CONNECTED");
+            changeElementVisibility("recordingdestination", true);
             setTimeout(init, 2000);
         });
 
@@ -172,7 +183,13 @@
             document.getElementById("diskmeter").value = value;
         }
 
-        async function updateRecordingDestination() {        
+        async function updateRecordingDestination() {
+            // hide recording path if requested
+            if (urlParams.has("hidebottom")) {
+                changeElementVisibility("recordingdestination", false);
+                return;
+            }
+
             let { recordDirectory } = await obs.call("GetRecordDirectory");
             if (recordDirectory) changeElementContent("recordingdestination", recordDirectory);
         }
@@ -184,6 +201,10 @@
 
         function changeElementColor(id, color) {
             document.getElementById(id).style.color = color;
+        }
+
+        function changeElementVisibility(id, visibility) {
+            document.getElementById(id).style.visibility = visibility ? "":"hidden";
         }
 
         function trimTimecode(tc) {

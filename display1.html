@@ -2,8 +2,8 @@
 <html>
 <head>
     <meta charset="utf-8" />
-    <title></title>
-	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/css/all.min.css" integrity="sha512-xh6O/CkQoPOWDdYTDqeRdPCVd1SpvCA9XXcUnZS2FmJNp1coAFzvtCN9BmamE+4aHK8yyUHUSCcJHgXloTyT2A==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <title>Streaming Status</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css" integrity="sha512-Kc323vGBEqzTmouAECnVceyQqyqdsSiqLQISBL29aUW4U/M7pSPA/gEUZQqv1cwx4OnYxTxve5UMg5GT6L4JJg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
     <style>
         body{margin:0; padding:0;background-color:#000;color:#fff}
         .wrapper{width:100%;height:100%;padding:1% 0 0%;}
@@ -13,6 +13,7 @@
         .data2{width:40%;height:45%;float:right;padding-left:5%}
         .destination{width:100%;height:5%;padding-top:2%}
         .stext{font:bold 27vh/27vh Arial Black, sans-serif;text-align: center;text-transform:uppercase}
+        .smlstext{font:bold 18vh/27vh Arial Black, sans-serif !important}
         .ttext{font:400 13vh/12vh Tahoma, sans-serif;text-align: center;text-transform:uppercase}
         .d1text, .d2text{font:400 5vh/4vh Tahoma, sans-serif;margin:0;padding:0;text-transform:uppercase}
         .d1btext, .d2btext{font:400 22vh/19vh Tahoma, sans-serif;text-transform:uppercase;margin:0;padding:0}
@@ -21,13 +22,15 @@
         .destext{font:400 11vh/8vh Tahoma, sans-serif;text-align: center;text-transform:uppercase}
         .glow{text-shadow: 0 0 10px #272727, 0 0 30px #fc4f4f;}
     </style>
-    <script src="https://cdn.jsdelivr.net/npm/obs-websocket-js@5.0.1/dist/obs-ws.min.js" integrity="sha256-UbkntZrYTokZf8tldcF9nmOn5CNgcmDP+MNsUcKUpEE=" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/obs-websocket-js@5.0/dist/obs-ws.global.min.js"></script>
     <script>
         window.addEventListener("load", init, false);
         var obsHost = "127.0.0.1:4455";       // Change the server IP/port here
         var obsPassword = "secret-password";  // Set password here
+        var obsProtocol = "ws";               // change protocol here (if you know what you are doing)
 
         const obs = new OBSWebSocket();
+        const urlParams = new URLSearchParams(window.location.search);
         var interval = null;
 
         async function init() {
@@ -37,15 +40,20 @@
 
         // Handle websocket connection stuff
         async function attemptConnection() {
+            // Read url, password and protocol from url params if set
+            obsProtocol = urlParams.has("secure") ? "wss" : obsProtocol;
+            obsHost = urlParams.get("host") ?? obsHost;
+            obsPassword = urlParams.get("password") ?? obsPassword;
+
             // Try to connect to obs
             try {
                 const {
                     obsWebSocketVersion,
                     negotiatedRpcVersion
-                } = await obs.connect(`ws://${obsHost}`, obsPassword, {rpcVersion: 1});
+                } = await obs.connect(`${obsProtocol}://${obsHost}`, obsPassword, {rpcVersion: 1});
                 console.log(`Connected to obs-websocket ${obsWebSocketVersion} (using RPC ${negotiatedRpcVersion})`);
             } catch (error) {
-                console.error("Failed to connect", error.code, error.message);                
+                console.error("Failed to connect", error.code, error.message);
             }
         }
 
@@ -54,35 +62,39 @@
             await updateStreamingDestination();
 
             var lastStatus = "";
+
+            var DOMstreamstatus = document.getElementById("streamstatus");
+            async function updateStreamStatus() {
+                let res = await obs.call("GetStreamStatus");
+                if (res) {
+                    setTimecode(res.outputTimecode);
+                    setStreamDataRate(res.outputBytes);
+                    calculateColorStatus(res.outputCongestion);
+                    // Add reconnecting text
+                    if (res.outputReconnecting && DOMstreamstatus.innerText.toLowerCase() != "reconnecting") {
+                        lastStatus = DOMstreamstatus.innerText;
+                        DOMstreamstatus.innerText = "reconnecting";
+                    }
+                    // Get rid of reconnecting text
+                    if (!res.outputReconnecting && DOMstreamstatus.innerText.toLowerCase() == "reconnecting") DOMstreamstatus.innerText = lastStatus;
+                    // If offline but status out of sync because reload, update
+                    if (res.outputActive && DOMstreamstatus.innerText.toLowerCase() == "off") {
+                        setLiveTextFormating("red");
+                        changeElementContent("streamstatus", "on air");
+                    }
+                    // Stop itself when stream no longer active
+                    if (!res.outputActive) {
+                        clearInterval(interval);
+                        interval = null;
+                        changeElementColor("streamhealth", "white");
+                        console.log("Stopping timer because output is inactive");
+                    }
+                }
+            }
+
             async function startPollData() {
-                var DOMstreamstatus = document.getElementById("streamstatus");
                 if (!interval) {
-                    interval = setInterval( async () => {
-                        let res = await obs.call("GetStreamStatus");
-                        if (res) {
-                            setTimecode(res.outputTimecode);
-                            setStreamDataRate(res.outputBytes);
-                            calculateColorStatus(res.outputCongestion);
-                            // Add reconnecting text
-                            if (res.outputReconnecting && DOMstreamstatus.innerText.toLowerCase() != "reconnecting") {
-                                lastStatus = DOMstreamstatus.innerText;
-                                DOMstreamstatus.innerText = "reconnecting";
-                            }
-                            // Get rid of reconnecting text
-                            if (!res.outputReconnecting && DOMstreamstatus.innerText.toLowerCase() == "reconnecting") DOMstreamstatus.innerText = lastStatus;
-                            // If offline but status out of sync because reload, update
-                            if (res.outputActive && DOMstreamstatus.innerText.toLowerCase() == "off") {
-                                setLiveTextFormating("red");
-                                changeElementContent("streamstatus", "on air");
-                            }
-                            // Stop itself when stream lo longer active
-                            if (!res.outputActive) {
-                                clearInterval(interval);
-                                interval = null;
-                                changeElementColor("streamhealth", "white");
-                            }
-                        }
-                    }, 1000);
+                    interval = setInterval(updateStreamStatus, 1000);
                 }
             }
             await startPollData();
@@ -100,13 +112,16 @@
                         setLiveTextFormating("red");
                         changeElementContent("streamstatus", "connecting");
                         await updateStreamingDestination();
-                        await startPollData();
                         break;
                     case "OBS_WEBSOCKET_OUTPUT_STARTED":
                         changeElementContent("streamstatus", "on air");
+                        await startPollData();
                         break;
                     case "OBS_WEBSOCKET_OUTPUT_STOPPING":
                         changeElementContent("streamstatus", "disconnecting");
+                        // prevent from polling garbage data from obs
+                        clearInterval(interval);
+                        interval = null;
                         break;
                     case "OBS_WEBSOCKET_OUTPUT_STOPPED":
                         setLiveTextFormating("white");
@@ -126,6 +141,8 @@
         obs.on("ConnectionClosed", () => {
             clearInterval(interval);
             interval = null;
+            changeElementContent("streamdestination", "NOT CONNECTED");
+            changeElementVisibility("streamdestination", true);
             console.log("Connection Closed");
             setTimeout(init, 2000);
         });
@@ -168,17 +185,22 @@
             changeElementContent("streamtimecode", trimTimecode(tc));
         }
 
-        async function updateStreamingDestination() {        
-            let { streamServiceType, streamServiceSettings } = await obs.call("GetStreamServiceSettings");
+        async function updateStreamingDestination() {
+            // hide url if requested
+            if (urlParams.has("hidebottom")) {
+                changeElementVisibility("streamdestination", false);
+                return;
+            }
+
             const elem = document.getElementById("streamdestination");
+            let { streamServiceType, streamServiceSettings } = await obs.call("GetStreamServiceSettings");
             if (streamServiceType && streamServiceSettings) {
                 if (streamServiceType == "rtmp_common" && streamServiceSettings.service == "YouTube / YouTube Gaming") {
                     elem.innerText = "YouTube";
                 } else if (streamServiceType == "rtmp_common" && streamServiceSettings.hasOwnProperty("service")) {
                     elem.innerText = streamServiceSettings.service;
                 } else if (streamServiceType == "rtmp_custom" && streamServiceSettings.hasOwnProperty("server") && streamServiceSettings.server != "") {
-                    var url = new URL(streamServiceSettings.server.replace("rtmp", "http")).hostname;
-                    elem.innerText = url;
+                    elem.innerText = new URL(streamServiceSettings.server.replace("rtmp", "http").replace("srt", "http")).hostname;;
                 } else {
                     elem.innerText = "Nothing?";
                 }
@@ -209,17 +231,28 @@
                 if (green > 1.0) green = 1.0;
                 green *= 255.0;
 
-				changeElementColor("streamhealth", `rgb(${Math.floor(red)}, ${Math.floor(green)}, 0)`);
+                changeElementColor("streamhealth", `rgb(${Math.floor(red)}, ${Math.floor(green)}, 0)`);
             }
         }
 
         // Utils
         function changeElementContent(id, newContent) {
             document.getElementById(id).innerText = newContent;
+            if (id == "streamstatus") {
+                if ( ["connecting", "disconnecting"].includes(newContent)) {
+                    document.getElementById(id).classList.add("smlstext");
+                } else {
+                    document.getElementById(id).classList.remove("smlstext");
+                }
+            }
         }
 
         function changeElementColor(id, color) {
             document.getElementById(id).style.color = color;
+        }
+
+        function changeElementVisibility(id, visibility) {
+            document.getElementById(id).style.visibility = visibility ? "":"hidden";
         }
 
         function trimTimecode(tc) {
