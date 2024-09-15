@@ -61,9 +61,11 @@ Big thanks to my co-dev Rgenxer ([facebook.com/temzlemdor](https://www.facebook.
 And thanks to [Miniontoby](https://github.com/Miniontoby) for making the display3.html page.
 
 ## Examples in stand-by
-Both pages used in multiview:
-![Example image of display2.html](https://cdn.lebaston100.de/git/amv/display3.png)
+All pages used in multiview:
+![Example image of obs multiview](https://cdn.lebaston100.de/git/amv/everything.png)
 display1.html:
 ![Example image of display1.html](https://cdn.lebaston100.de/git/amv/display1.png)
 display2.html:
 ![Example image of display2.html](https://cdn.lebaston100.de/git/amv/display2.png)
+display2.html:
+![Example image of display3.html](https://cdn.lebaston100.de/git/amv/display3.png)
