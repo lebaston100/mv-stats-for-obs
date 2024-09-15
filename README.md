@@ -67,5 +67,5 @@ display1.html:
 ![Example image of display1.html](https://cdn.lebaston100.de/git/amv/display1.png)
 display2.html:
 ![Example image of display2.html](https://cdn.lebaston100.de/git/amv/display2.png)
-display2.html:
+display3.html:
 ![Example image of display3.html](https://cdn.lebaston100.de/git/amv/display3.png)
