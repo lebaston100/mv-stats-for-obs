@@ -1,0 +1,233 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>Audio Stats</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css" integrity="sha512-Kc323vGBEqzTmouAECnVceyQqyqdsSiqLQISBL29aUW4U/M7pSPA/gEUZQqv1cwx4OnYxTxve5UMg5GT6L4JJg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <style>
+        body{margin:0; padding:0;background-color:#000;color:#fff;font-family:Tahoma, sans-serif;font-size:2.9rem}
+        .wrapper{width:100%;height:100%;padding:1% 0 0%;display:none}
+        #notconnected{position:fixed;left:50%;top:50%;font:400 11vh/20vh Tahoma, sans-serif;transform:translate(-50%, -50%)}
+        .meter{display:grid;grid-template-columns:1fr;grid-template-rows:auto auto auto 2fr auto;gap:2px 0px;grid-auto-flow:row;
+            grid-template-areas:
+                "Name"
+                "HR"
+                "EQDY"
+                "VUMeter"
+                "Volume";
+            width:300px;height:97vh;place-content:center;
+        }
+        .meter.muted{filter:brightness(0.4)}
+        .meter>.Name{grid-area:Name;text-align:center}
+        .meter>.HR{grid-area:HR;width:75%;border-width:4px;border-color:orange;border-top-style:solid}
+        .meter.muted>.HR{border-color:white}
+        .meter>.EQDY{grid-area:EQDY;text-align:center;margin-bottom:20px}
+        .meter>.EQDY>.EQ,.meter>.EQDY>.DY{color:dimgrey;font-weight:bold}
+        .meter.EQEnabled>.EQDY>.EQ{color:aqua}
+        .meter.DYEnabled>.EQDY>.DY{color:magenta}
+        .VUMeter{display:grid;grid-template-columns:66px 20px 66px;grid-template-rows:1fr;gap:2px 0px;grid-auto-flow:row;grid-area:VUMeter;width:100%;height:100%;place-content:center}
+        .Mid{width:100%}
+        .Left,.Right{width:65px;height:100%;background:linear-gradient(red 0%,red 22%,transparent 22%,transparent 22.5%,#e2e200 22.5%,#e2e200 50%,transparent 50%,transparent 50.5%,green 50.5%,green 100%)}
+        .meter>.VUMeter>*{--alpha:0.4}
+        .meter.muted>.VUMeter>*{--alpha:0.5}
+        .Left:after,.Right:after{
+            content:'';width:100%;height:100%;display:inline-block;
+            background:linear-gradient(to top,rgba(0,0,0,0) 0%,rgba(0,0,0,0) var(--amount),rgba(0,0,0,var(--alpha)) var(--amount),rgba(0,0,0,var(--alpha)) 100%);
+        }
+        .Volume{grid-area:Volume;text-align:center}
+
+        .numbers{position:relative;width:calc(3rem * 2);--remove-top:calc(8px * 3);top:190px;height:calc(97vh - 190px)}
+        .numbers>div{position:absolute;color:#ddd;font-size:3rem;right:2px;text-align:right}
+        .Mid{position:relative;height:calc(100% - 13.5px);--remove-top:0px;place-content:center}
+        .Mid>hr{position:absolute;border-width:2px;border-color:white;border-top-style:solid;font-size:1rem;width:-moz-available;width:-webkit-fill-available;width:fill-available}
+
+        .Mid>.num0{--remove-top:8px}
+        .num0{top:calc(0% - var(--remove-top))}
+        .num5{top:calc(13% - var(--remove-top))}
+        .num10{top:calc(25% - var(--remove-top))}
+        .num15{top:calc(38% - var(--remove-top))}
+        .num20{top:calc(50% - var(--remove-top))}
+        .num30{top:calc(69% - var(--remove-top))}
+        .num40{top:calc(84% - var(--remove-top))}
+        .num50{top:calc(92% - var(--remove-top))}
+        .num60{top:calc(100% - var(--remove-top))}
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/obs-websocket-js@5.0/dist/obs-ws.global.min.js"></script>
+    <script>
+        window.addEventListener("load", init, false);
+        var obsHost = "127.0.0.1:4455";       // Change the server IP/port here
+        var obsPassword = "secret-password";  // Set password here
+        var obsProtocol = "ws";               // change protocol here (if you know what you are doing)
+
+        const obs = new OBSWebSocket();
+        const urlParams = new URLSearchParams(window.location.search);
+
+        async function init() {
+            console.log("Trying to connect to obs...");
+            await attemptConnection();
+        }
+
+        // Handle websocket connection stuff
+        async function attemptConnection() {
+            // Read url, password and protocol from url params if set
+            obsProtocol = urlParams.get("secure")?.toLowerCase()=="true" ? "wss" : obsProtocol;
+            obsHost = urlParams.get("host") ?? obsHost;
+            obsPassword = urlParams.get("password") ?? obsPassword;
+
+            document.querySelector('#notconnected').style.display = '';
+            document.querySelector('.wrapper').style.display = 'none';
+
+            // Try to connect to obs
+            try {
+                const {
+                    obsWebSocketVersion,
+                    negotiatedRpcVersion
+                } = await obs.connect(`${obsProtocol}://${obsHost}`, obsPassword, {
+                    rpcVersion: 1,
+                    eventSubscriptions: OBSWebSocket.EventSubscription.All | OBSWebSocket.EventSubscription.InputVolumeMeters | OBSWebSocket.EventSubscription.Inputs | OBSWebSocket.EventSubscription.Filters,
+                });
+                console.log(`Connected to obs-websocket ${obsWebSocketVersion} (using RPC ${negotiatedRpcVersion})`);
+
+                document.querySelector('#notconnected').style.display = 'none';
+                document.querySelector('.wrapper').style.display = 'flex';
+            } catch (error) {
+                console.error("Failed to connect", error.code, error.message);
+            }
+        }
+
+        let inputStates = {};
+
+        function mul_to_decibel(inMul) {
+            const val=-(Math.log10(inMul)*20);
+            return val<60?val:Infinity;
+        }
+
+        function value_to_perc(value) { // value is NOT negative...
+            if (value==Infinity||value>60)return '0%';
+            if (value<=60&&value>=40)return `${(3-(value-30)/10)*8}%`;
+            if (value>30)return `${-1.5*value+76}%`;
+            if (value>20)return `${-1.9*value+88}%`;
+            if (value<=20&&value>=0)return `${100-(value/40*100)}%`;
+            return '100%';
+        }
+
+        function updateNumberPosition() {
+            bounds = Array.from(document.querySelectorAll(".meter > div.VUMeter > div.Right")).map(e => e.getBoundingClientRect());
+            let newBounds = {};
+            for (const bound of bounds) {
+                if (!('top' in newBounds) || bound.top < newBounds.top) {
+                    newBounds.top = bound.top;
+                    newBounds.height = bound.height;
+                }
+            }
+            if ('top' in newBounds && 'height' in newBounds) {
+                document.querySelector('.numbers').style.top = `${newBounds.top - 20}px`;
+                document.querySelector('.numbers').style.height = `${newBounds.height}px`;
+            }
+        }
+
+        obs.on("Identified", async () => {
+            function reloadSourceFilterList(sourceName) {
+                if (obs.identified && sourceName in inputStates) return obs.call('GetSourceFilterList', { sourceName }).then(({ filters }) => { inputStates[sourceName].filters = filters.filter((filter) => filter.filterEnabled); });
+            }
+            obs.on("InputVolumeMeters", ({ inputs }) => {
+                let i = 0;
+                for (let { inputName, inputLevelsMul } of inputs) {
+                    // if meter is missing, create it from the template
+                    if (document.querySelector(`#meter-${i}`)==undefined) {
+                        let thisnode = document.querySelector('template#metertemplate').content.cloneNode(true);
+                        thisnode.children[0].id = 'meter-' + i;
+                        thisnode.children[0].children[0].innerText = inputName;
+                        document.querySelector('.wrapper').appendChild(thisnode);
+                    }
+                    if (document.querySelector(`#meter-${i} .Name`).innerText !== inputName) document.querySelector(`#meter-${i} .Name`).innerText = inputName;
+                    if (!(inputName in inputStates)) {
+                        inputStates[inputName] = { muted: false, filters: [] };
+                        obs.call('GetInputMute', { inputName }).then(({ inputMuted }) => { inputStates[inputName].muted = inputMuted; });
+                        reloadSourceFilterList(inputName);
+                    }
+                    let j = 0;
+
+                    document.querySelector(`#meter-${i}`).className = 'meter' + (inputName in inputStates ? ((inputStates[inputName].muted ? ' muted' : '') + (inputStates[inputName].filters.find(f => f.filterKind === 'basic_eq_filter') ? ' EQEnabled' : '') + (inputStates[inputName].filters.find(f => f.filterKind === 'compressor_filter') ? ' DYEnabled' : '')) : ''); 
+
+                    // if no data inputlevel data is received, make sure to set the data to all zeros
+                    if (inputLevelsMul.length == 0) inputLevelsMul = [[0, 0, 0], [0, 0, 0]]
+                    if (inputLevelsMul.length == 1) inputLevelsMul.push([0, 0, 0]);
+                    for (const level of inputLevelsMul) {
+                        if (j>=2) break; // just do two channels
+                        const value = mul_to_decibel(inputStates[inputName].muted ? level[2] : level[1]); // highest sound...
+                        document.querySelector(`#meter-${i}>div.Volume`).innerText = (value == Infinity) ? "-∞" : -Math.round(value);
+			if (j==0) document.querySelector(`#meter-${i}>div.VUMeter>div.Left`).style.setProperty('--amount', value_to_perc(value));
+			if (j==1) document.querySelector(`#meter-${i}>div.VUMeter>div.Right`).style.setProperty('--amount', value_to_perc(value));
+                        j++;
+                    }
+                    i++;
+                    if (i >= 10) break; // it cannot show more than 11... but just stop at 10
+                }
+                // if more meters exist, delete them
+                if (document.querySelector(`#meter-${i}`)) {
+                    const inputName = document.querySelector(`#meter-${i} .Name`).innerText;
+                    if (inputName in inputStates) delete inputStates[inputName];
+                    document.querySelector(`#meter-${i}`).remove();
+                }
+
+                updateNumberPosition();
+            });
+            obs.on("InputMuteStateChanged", ({ inputName, inputMuted }) => {
+                if (inputName in inputStates) inputStates[inputName].muted = inputMuted;
+            });
+            obs.on("SourceFilterEnableStateChanged", ({ sourceName }) => reloadSourceFilterList(sourceName));
+            obs.on("SourceFilterCreated", ({ sourceName }) => reloadSourceFilterList(sourceName));
+            obs.on("SourceFilterRemoved", ({ sourceName }) => reloadSourceFilterList(sourceName));
+        });
+
+        obs.on("ConnectionClosed", () => {
+            console.log("Connection Closed");
+            document.querySelector('#notconnected').style.display = '';
+            document.querySelector('.wrapper').style.display = 'none';
+            setTimeout(init, 2000);
+        });
+    </script>
+</head>
+<body>
+    <template id="metertemplate">
+        <div class="meter" id="meter">
+            <div class="Name">MIC1</div>
+            <hr class="HR">
+            <div class="EQDY"><span class="EQ">EQ</span> | <span class="DY">DY</span></div>
+            <div class="VUMeter">
+                <div class="Left"></div>
+                <div class="Mid">
+                    <hr class="num0">
+                    <hr class="num5">
+                    <hr class="num10">
+                    <hr class="num15">
+                    <hr class="num20">
+                    <hr class="num30">
+                    <hr class="num40">
+                    <hr class="num50">
+                    <hr class="num60">
+                </div>
+                <div class="Right"></div>
+            </div>
+            <div class="Volume"></div>
+        </div>
+    </template>
+    <div class="wrapper">
+        <div class="numbers">
+            <div class="num0">0</div>
+            <div class="num5">-5</div>
+            <div class="num10">-10</div>
+            <div class="num15">-15</div>
+            <div class="num20">-20</div>
+            <div class="num30">-30</div>
+            <div class="num40">-40</div>
+            <div class="num50">-50</div>
+            <div class="num60">-60</div>
+        </div>
+    </div>
+    <div id="notconnected">
+        <h1>Not connected!</h1>
+    </div>
+</body>
+</html>

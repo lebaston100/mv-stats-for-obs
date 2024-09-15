@@ -1,10 +1,12 @@
 # Multiview Stats for obs-studio
 
-This provides you with an atem-mini like multiview stats display to show the recording/streaming status, free disk space, stream health, current stream bitrate and streaming/recording timecode.
+This provides you with an atem-mini like multiview stats display to show the recording/streaming status, free disk space, stream health, current stream bitrate, streaming/recording timecode, audio levels and audio filters.
 
 display1.html is all about streaming related stats. The big text on the top shows the current streaming status and the stream timecode. The middle left part displays the current bitrate that is beeing sent and the middle right part shows the network congestion in the same color that the small rectangle in the obs status bar would show. The bottom line shows the streaming service (Either the name or the custom url).
 
 display2.html is mostly about recording related stats. The big text on the top shows the current recording status and the recording timecode. The middle left part displays the free disk space but be warned this is not an absolute value but calculated relative to the first free disk space value that obs sends (which is basically the free space before the recording started). The middle right part shows the current render framerate. The bottom text shows the current configured recording path.
+
+display3.html is all about audio related stats. It shows all the input sources you have. The EQ shows if you have an Equalizer filter enabled. The DY shows if you have a compressor filter enabled. The maximum of sources it can and will show is 10. After that, the volume numbers and the other sources won't show up anymore. When a source is muted, the level will ignore the volume setting, there is no way to avoid that. Hidden sources will still show and sources that don't show up in OBS, like browser views without the control audio in OBS, will also show.
 
 All data will auto-populate when the page is loaded and obs with obs-websocket enabled is running.
 
@@ -22,6 +24,7 @@ All data will auto-populate when the page is loaded and obs with obs-websocket e
 Using the web hosted version:
 - URL for streaming stats: [http://mv-stats.lebaston100.de/display1.html?password=mypassword](http://mv-stats.lebaston100.de/display1.html?password=mypassword)
 - URL for recording stats: [http://mv-stats.lebaston100.de/display2.html?password=mypassword](http://mv-stats.lebaston100.de/display2.html?password=mypassword)
+- URL for audio stats: [http://mv-stats.lebaston100.de/display3.html?password=mypassword](http://mv-stats.lebaston100.de/display3.html?password=mypassword)
 - Create a scene for each of the required pages
 - Create a browser source per scene
 - Paste the url into the "URL" input with your password updated if you use one (For more details see "Configuration (parameters)" section below)
@@ -55,6 +58,7 @@ The first url parameter needs to use a ? instead of &. Also it's possible that y
 If you have any problems, just open a Github issue or join my [Discord Server](https://discord.gg/PCYQJwX).
 
 Big thanks to my co-dev Rgenxer ([facebook.com/temzlemdor](https://www.facebook.com/temzlemdor) / Rgenxer#1169) for doing all the initial frontend development for monitor1.html and monitor2.html.
+And thanks to [Miniontoby](https://github.com/Miniontoby) for making the display3.html page.
 
 ## Examples in stand-by
 Both pages used in multiview:
