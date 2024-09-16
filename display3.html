@@ -130,6 +130,7 @@
             function reloadSourceFilterList(sourceName) {
                 if (obs.identified && sourceName in inputStates) return obs.call('GetSourceFilterList', { sourceName }).then(({ filters }) => { inputStates[sourceName].filters = filters.filter((filter) => filter.filterEnabled); });
             }
+
             obs.on("InputVolumeMeters", ({ inputs }) => {
                 let i = 0;
                 for (let { inputName, inputLevelsMul } of inputs) {
@@ -155,10 +156,11 @@
                     if (inputLevelsMul.length == 1) inputLevelsMul.push([0, 0, 0]);
                     for (const level of inputLevelsMul) {
                         if (j>=2) break; // just do two channels
-                        const value = mul_to_decibel(inputStates[inputName].muted ? level[2] : level[1]); // highest sound...
+                        const meterlevel = urlParams.has("metersource") ? level[parseInt(urlParams.get("metersource"))] : inputStates[inputName].muted ? level[2] : level[1]
+                        const value = mul_to_decibel(meterlevel);
                         document.querySelector(`#meter-${i}>div.Volume`).innerText = (value == Infinity) ? "-∞" : -Math.round(value);
-			if (j==0) document.querySelector(`#meter-${i}>div.VUMeter>div.Left`).style.setProperty('--amount', value_to_perc(value));
-			if (j==1) document.querySelector(`#meter-${i}>div.VUMeter>div.Right`).style.setProperty('--amount', value_to_perc(value));
+                        if (j==0) document.querySelector(`#meter-${i}>div.VUMeter>div.Left`).style.setProperty('--amount', value_to_perc(value));
+                        if (j==1) document.querySelector(`#meter-${i}>div.VUMeter>div.Right`).style.setProperty('--amount', value_to_perc(value));
                         j++;
                     }
                     i++;

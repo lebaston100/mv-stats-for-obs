@@ -49,11 +49,12 @@ There are two different way to set settings, either by editing the default value
 #### When using url parameters:
 The first url parameter needs to use a ? instead of &. Also it's possible that you may need to url-encode your host/password values if they contain special characters (esp. ?&=). Just type your host/password into [this website](https://urlencode.org/), click encode and use the displayed value in the url.
 
-#### Available parameters:
+#### Available parameters (all optional):
 - &host= (url param) / var obsHost = (file): This configures the ip or hostname and port of the machine running obs-websocket. It defaults to localhost/127.0.0.1 so only needs to be added if you're connecting from a different machine then the local one.
 - &password= (url param) / var obsPassword = (file): This configures the password used to authenticate with obs-websocket. Only needed if you have enabled authentication in obs-websocket.
 - &hidebottom (url param) / (no file param): This hides the server address for monitor1 and recording path for monitor 2 to not overlay with the multiview scene name labels.
 - &secure (url param) / obsProtocol = (file): Only use this if you know exactly what you are doing! Can be used to switch to wss for the websocket connection when using a wss proxy.
+- &metersource (url param) / (no file param): Statically selects which meters to show. 1=postfader (post-fader post-mute), 2=prefader(pre-fader pre-mute). Default is dynamic switching between 1 (source unmuted) and 2 (source muted). Only works for monitor3.html
 
 If you have any problems, just open a Github issue or join my [Discord Server](https://discord.gg/PCYQJwX).
 
