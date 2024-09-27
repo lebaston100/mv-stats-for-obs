@@ -147,12 +147,16 @@
 
                     // If we haven't seen this input before, we get it's settings
                     if (!(inputName in inputStates)) {
-                        inputStates[inputName] = { muted: false, filters: [] };
+                        inputStates[inputName] = { muted: false, volume: 0, filters: [] };
                         obs.call('GetInputMute', { inputName }).then(({ inputMuted }) => { inputStates[inputName].muted = inputMuted; });
+                        obs.call('GetInputVolume', { inputName }).then(({ inputVolumeDb }) => { inputStates[inputName].volume = inputVolumeDb; });
                         reloadSourceFilterList(inputName);
                     }
 
                     document.querySelector(`#meter-${i}`).className = 'meter' + (inputName in inputStates ? ((inputStates[inputName].muted ? ' muted' : '') + (inputStates[inputName].filters.find(f => f.filterKind === 'basic_eq_filter') ? ' EQEnabled' : '') + (inputStates[inputName].filters.find(f => f.filterKind === 'compressor_filter') ? ' DYEnabled' : '')) : ''); 
+
+                    // Set the volume slider value at the bottom.
+                    document.querySelector(`#meter-${i}>div.Volume`).innerText = ((inputName in inputStates && inputStates[inputName].volume > -100) ? Math.round(inputStates[inputName].volume * 10) / 10 : "-∞") + " dB";
 
                     // if no data inputlevel data is received, make sure to set the data to all zeros
                     if (inputLevelsMul.length == 0) inputLevelsMul = [[0, 0, 0], [0, 0, 0]]
@@ -163,7 +167,6 @@
                         if (j>=2) break; // just do two channels
                         const meterlevel = urlParams.has("metersource") ? level[parseInt(urlParams.get("metersource"))] : inputStates[inputName].muted ? level[2] : level[1]; // level consists of [VU, POSTFADER, PREFADER]
                         const value = mul_to_decibel(meterlevel);
-                        document.querySelector(`#meter-${i}>div.Volume`).innerText = (value == Infinity) ? "-∞" : -Math.round(value);
                         if (j==0) document.querySelector(`#meter-${i}>div.VUMeter>div.Left`).style.setProperty('--amount', value_to_perc(value));
                         if (j==1) document.querySelector(`#meter-${i}>div.VUMeter>div.Right`).style.setProperty('--amount', value_to_perc(value));
                         j++;
@@ -185,6 +188,9 @@
             });
             obs.on("InputMuteStateChanged", ({ inputName, inputMuted }) => {
                 if (inputName in inputStates) inputStates[inputName].muted = inputMuted;
+            });
+            obs.on("InputVolumeChanged", ({ inputName, inputVolumeDb }) => {
+                if (inputName in inputStates) inputStates[inputName].volume = inputVolumeDb;
             });
             obs.on("SourceFilterEnableStateChanged", ({ sourceName }) => reloadSourceFilterList(sourceName));
             obs.on("SourceFilterCreated", ({ sourceName }) => reloadSourceFilterList(sourceName));
