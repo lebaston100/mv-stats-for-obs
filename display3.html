@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8" />
@@ -98,7 +98,7 @@
         let inputStates = {};
 
         function mul_to_decibel(inMul) {
-            const val=-(Math.log10(inMul)*20);
+            const val = -(Math.log10(inMul) * 20);
             return val<60?val:Infinity;
         }
 
@@ -134,31 +134,39 @@
             obs.on("InputVolumeMeters", ({ inputs }) => {
                 let i = 0;
                 for (let { inputName, inputLevelsMul } of inputs) {
-                    // if meter is missing, create it from the template
-                    if (document.querySelector(`#meter-${i}`)==undefined) {
+                    // When this meter doesn't have an element yet, we create it from the template
+                    if (document.querySelector(`#meter-${i}`) == undefined) {
                         let thisnode = document.querySelector('template#metertemplate').content.cloneNode(true);
                         thisnode.children[0].id = 'meter-' + i;
                         thisnode.children[0].children[0].innerText = inputName;
                         document.querySelector('.wrapper').appendChild(thisnode);
                     }
+
+                    // If meter name is not the same (meaning inputs have been swapped places) we set the name
                     if (document.querySelector(`#meter-${i} .Name`).innerText !== inputName) document.querySelector(`#meter-${i} .Name`).innerText = inputName;
+
+                    // If we haven't seen this input before, we get it's settings
                     if (!(inputName in inputStates)) {
-                        inputStates[inputName] = { muted: false, filters: [] };
+                        inputStates[inputName] = { muted: false, volume: 0, filters: [] };
                         obs.call('GetInputMute', { inputName }).then(({ inputMuted }) => { inputStates[inputName].muted = inputMuted; });
+                        obs.call('GetInputVolume', { inputName }).then(({ inputVolumeDb }) => { inputStates[inputName].volume = inputVolumeDb; });
                         reloadSourceFilterList(inputName);
                     }
-                    let j = 0;
 
                     document.querySelector(`#meter-${i}`).className = 'meter' + (inputName in inputStates ? ((inputStates[inputName].muted ? ' muted' : '') + (inputStates[inputName].filters.find(f => f.filterKind === 'basic_eq_filter') ? ' EQEnabled' : '') + (inputStates[inputName].filters.find(f => f.filterKind === 'compressor_filter') ? ' DYEnabled' : '')) : ''); 
+
+                    // Set the volume slider value at the bottom.
+                    document.querySelector(`#meter-${i}>div.Volume`).innerText = ((inputName in inputStates && inputStates[inputName].volume > -100) ? Math.round(inputStates[inputName].volume * 10) / 10 : "-∞") + " dB";
 
                     // if no data inputlevel data is received, make sure to set the data to all zeros
                     if (inputLevelsMul.length == 0) inputLevelsMul = [[0, 0, 0], [0, 0, 0]]
                     if (inputLevelsMul.length == 1) inputLevelsMul.push([0, 0, 0]);
+
+                    let j = 0;
                     for (const level of inputLevelsMul) {
                         if (j>=2) break; // just do two channels
-                        const meterlevel = urlParams.has("metersource") ? level[parseInt(urlParams.get("metersource"))] : inputStates[inputName].muted ? level[2] : level[1]
+                        const meterlevel = urlParams.has("metersource") ? level[parseInt(urlParams.get("metersource"))] : inputStates[inputName].muted ? level[2] : level[1]; // level consists of [VU, POSTFADER, PREFADER]
                         const value = mul_to_decibel(meterlevel);
-                        document.querySelector(`#meter-${i}>div.Volume`).innerText = (value == Infinity) ? "-∞" : -Math.round(value);
                         if (j==0) document.querySelector(`#meter-${i}>div.VUMeter>div.Left`).style.setProperty('--amount', value_to_perc(value));
                         if (j==1) document.querySelector(`#meter-${i}>div.VUMeter>div.Right`).style.setProperty('--amount', value_to_perc(value));
                         j++;
@@ -166,17 +174,23 @@
                     i++;
                     if (i >= 10) break; // it cannot show more than 11... but just stop at 10
                 }
-                // if more meters exist, delete them
-                if (document.querySelector(`#meter-${i}`)) {
-                    const inputName = document.querySelector(`#meter-${i} .Name`).innerText;
+
+                // If more meters exist, delete them
+                const allMeters = Array.from(document.querySelectorAll('.meter'));
+                const metersTooMuch = allMeters.filter((e, idx) => idx >= i);
+                for (const element of metersTooMuch) {
+                    const inputName = element.querySelector('.Name')?.innerText;
                     if (inputName in inputStates) delete inputStates[inputName];
-                    document.querySelector(`#meter-${i}`).remove();
+                    element.remove();
                 }
 
                 updateNumberPosition();
             });
             obs.on("InputMuteStateChanged", ({ inputName, inputMuted }) => {
                 if (inputName in inputStates) inputStates[inputName].muted = inputMuted;
+            });
+            obs.on("InputVolumeChanged", ({ inputName, inputVolumeDb }) => {
+                if (inputName in inputStates) inputStates[inputName].volume = inputVolumeDb;
             });
             obs.on("SourceFilterEnableStateChanged", ({ sourceName }) => reloadSourceFilterList(sourceName));
             obs.on("SourceFilterCreated", ({ sourceName }) => reloadSourceFilterList(sourceName));
