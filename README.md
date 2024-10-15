@@ -1,6 +1,6 @@
 # Multiview Stats for obs-studio
 
-This provides you with an atem-mini like multiview stats display to show the recording/streaming status, free disk space, stream health, current stream bitrate, streaming/recording timecode, audio levels and audio filters.
+This provides you with an atem-mini like multiview stats display to show the recording/streaming status, free disk space, stream health, current stream bitrate, streaming/recording timecode, audio levels and selected audio filters.
 
 display1.html is all about streaming related stats. The big text on the top shows the current streaming status and the stream timecode. The middle left part displays the current bitrate that is beeing sent and the middle right part shows the network congestion in the same color that the small rectangle in the obs status bar would show. The bottom line shows the streaming service (Either the name or the custom url).
 
@@ -37,14 +37,14 @@ Using the downloaded version:
 - Create a browser source per scene
 - Depending on how you want to supply your settings you can either:
     - RECOMMENDED: Input the path to your local file into the URL input prefixed with a `file:///`. For example: `file:///C:\display1.html?password=mypassword`. This way you can use the url parameters for configuration!
-    - Alternative: Select "Local file" and select the html file from the file browser. You'll need to edit the html file with a text editor to change settings like the password.
+    - Alternative: Select "Local file" and select the html file from the file browser. You'll need to edit the common.js file with a text editor to change settings like the password or run transferSettings.bat if you're on windows.
 - Set resolution to 1920x1080
 - (Optional to save a few resources) Check "Use custom frame rate" and lower render framerate to something like 10/15.
 - Note: The downloaded version still needs an internet connection to load third party dependencies for symbols and the obs connector.
 
 
 ### Configuration parameters
-There are two different way to set settings, either by editing the default values in the html files directly or using url parameters (all parameters are optional).
+There are two different way to set settings, either by editing the default values in the common.js file directly or using url parameters on the html files (all parameters are optional).
 
 #### When using url parameters:
 The first url parameter needs to use a ? instead of &. Also it's possible that you may need to url-encode your host/password values if they contain special characters (esp. ?&=). Just type your host/password into [this website](https://urlencode.org/), click encode and use the displayed value in the url.
