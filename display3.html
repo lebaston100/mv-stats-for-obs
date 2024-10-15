@@ -53,21 +53,9 @@
         .num60{top:calc(100% - var(--remove-top))}
     </style>
     <script src="https://cdn.jsdelivr.net/npm/obs-websocket-js@5.0/dist/obs-ws.global.min.js"></script>
+    <script src="common.js"></script>
     <script>
-        window.addEventListener("load", init, false);
-        var obsHost = "127.0.0.1:4455";       // Change the server IP/port here
-        var obsPassword = "secret-password";  // Set password here
-        var obsProtocol = "ws";               // change protocol here (if you know what you are doing)
-
-        const obs = new OBSWebSocket();
-        const urlParams = new URLSearchParams(window.location.search);
-
-        async function init() {
-            console.log("Trying to connect to obs...");
-            await attemptConnection();
-        }
-
-        // Handle websocket connection stuff
+        // Overwrite global because specific event subscriptions
         async function attemptConnection() {
             // Read url, password and protocol from url params if set
             obsProtocol = urlParams.get("secure")?.toLowerCase()=="true" ? "wss" : obsProtocol;
@@ -87,7 +75,7 @@
                     eventSubscriptions: OBSWebSocket.EventSubscription.All | OBSWebSocket.EventSubscription.InputVolumeMeters | OBSWebSocket.EventSubscription.Inputs | OBSWebSocket.EventSubscription.Filters,
                 });
                 console.log(`Connected to obs-websocket ${obsWebSocketVersion} (using RPC ${negotiatedRpcVersion})`);
-
+                
                 document.querySelector('#notconnected').style.display = 'none';
                 document.querySelector('.wrapper').style.display = 'flex';
             } catch (error) {
