@@ -44,6 +44,11 @@ function changeElementContent(id, newContent) {
     document.getElementById(id).innerText = newContent;
 }
 
+function TimecodeToTs(tc) {
+    parts = tc.split(":").map(x => parseFloat(x));
+    return parts[2]*1000 + parts[1]*60000 + parts[0]*3600000;
+}
+
 function trimTimecode(tc) {
     return tc.split(".")[0];
 }

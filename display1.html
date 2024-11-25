@@ -35,25 +35,25 @@
 
             var DOMstreamstatus = document.getElementById("streamstatus");
             async function updateStreamStatus() {
-                let res = await obs.call("GetStreamStatus");
-                if (res) {
-                    setTimecode(res.outputTimecode);
-                    setStreamDataRate(res.outputBytes);
-                    calculateColorStatus(res.outputCongestion);
+                let response = await obs.call("GetStreamStatus");
+                if (response) {
+                    setTimecode(response.outputTimecode);
+                    setStreamDataRate(response);
+                    calculateColorStatus(response.outputCongestion);
                     // Add reconnecting text
-                    if (res.outputReconnecting && DOMstreamstatus.innerText.toLowerCase() != "reconnecting") {
+                    if (response.outputReconnecting && DOMstreamstatus.innerText.toLowerCase() != "reconnecting") {
                         lastStatus = DOMstreamstatus.innerText;
                         DOMstreamstatus.innerText = "reconnecting";
                     }
                     // Get rid of reconnecting text
-                    if (!res.outputReconnecting && DOMstreamstatus.innerText.toLowerCase() == "reconnecting") DOMstreamstatus.innerText = lastStatus;
+                    if (!response.outputReconnecting && DOMstreamstatus.innerText.toLowerCase() == "reconnecting") DOMstreamstatus.innerText = lastStatus;
                     // If offline but status out of sync because reload, update
-                    if (res.outputActive && DOMstreamstatus.innerText.toLowerCase() == "off") {
+                    if (response.outputActive && DOMstreamstatus.innerText.toLowerCase() == "off") {
                         setLiveTextFormating("red");
                         changeElementContent("streamstatus", "on air");
                     }
                     // Stop itself when stream no longer active
-                    if (!res.outputActive) {
+                    if (!response.outputActive) {
                         clearInterval(interval);
                         interval = null;
                         changeElementColor("streamhealth", "white");
@@ -94,13 +94,15 @@
                         interval = null;
                         break;
                     case "OBS_WEBSOCKET_OUTPUT_STOPPED":
+                        // just in case obs skipped the stopping state
+                        clearInterval(interval);
                         setLiveTextFormating("white");
                         changeElementContent("streamstatus", "off");
                         setTimeout( () => {
                             setTimecode("00:00:00.000");
-                            setStreamDataRate(0);
+                            setStreamDataRate(false);
                             changeElementColor("streamhealth", "white");
-                        }, 1000);
+                        }, 300);
                         break;
                     default:
                         return;
@@ -129,26 +131,38 @@
             }
         }
 
-        var lastData = {
-            num: null,
-            time: Date.now()
+        var lastDataRateData = {
+            bytes: null,
+            time: null
         };
-        function setStreamDataRate(newBytes) {
-            if (lastData.num === null) {
-                lastData.num = newBytes;
+        var requestCount = 0;
+        function setStreamDataRate(res) {
+            if (!res) {
+                changeElementContent("streamdatarate", "0.00");
+                requestCount = 0;
+                return;
+            }     
+    
+            let bytes_now = res.outputBytes;
+            if (lastDataRateData.bytes === null) {
+                lastDataRateData.bytes = bytes_now;
                 return;
             }
-            let now = Date.now();
-            let timeDelta = now - lastData.time;
-            let dataDelta = newBytes - lastData.num;
-            let throughput = ((dataDelta/timeDelta)*1000)/125000;
-            lastData.num = newBytes;
-            lastData.time = now;
-            if (dataDelta == 0 || throughput < 0) {
+            // Only run calculations on every 2nd update to make them more stable
+            requestCount++;
+            if (requestCount % 2) return;
+
+            let ts_now = TimecodeToTs(res.outputTimecode);
+            let time_delta = ts_now - lastDataRateData.time;
+            let byte_delta = bytes_now - lastDataRateData.bytes;
+            let throughput = ((byte_delta/time_delta)*1000)/125000;
+            lastDataRateData.bytes = bytes_now;
+            lastDataRateData.time = ts_now;
+            if (byte_delta == 0 || throughput < 0) {
                 changeElementContent("streamdatarate", "0.00");
                 return;
             }
-            changeElementContent("streamdatarate", Math.abs(throughput.toFixed(2)));
+            changeElementContent("streamdatarate", throughput.toFixed(2));
         }
 
         function setTimecode(tc) {
