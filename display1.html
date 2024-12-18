@@ -43,7 +43,7 @@
                     // Add reconnecting text
                     if (response.outputReconnecting && DOMstreamstatus.innerText.toLowerCase() != "reconnecting") {
                         lastStatus = DOMstreamstatus.innerText;
-                        DOMstreamstatus.innerText = "reconnecting";
+                        changeElementContent("streamstatus", "reconnecting");
                     }
                     // Get rid of reconnecting text
                     if (!response.outputReconnecting && DOMstreamstatus.innerText.toLowerCase() == "reconnecting") DOMstreamstatus.innerText = lastStatus;
@@ -224,7 +224,7 @@
         function changeElementContent(id, newContent) {
             document.getElementById(id).innerText = newContent;
             if (id == "streamstatus") {
-                if ( ["connecting", "disconnecting"].includes(newContent)) {
+                if ( ["connecting", "disconnecting", "reconnecting"].includes(newContent)) {
                     document.getElementById(id).classList.add("smlstext");
                 } else {
                     document.getElementById(id).classList.remove("smlstext");
